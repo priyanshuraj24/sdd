@@ -2,11 +2,15 @@ import { useState } from "react";
 
 import { useEffect } from "react";
 import { IoClose } from "react-icons/io5";
-import { MdOutlineEdit } from "react-icons/md";
+import {
+  MdCheckBox,
+  MdCheckBoxOutlineBlank,
+  MdOutlineEdit,
+} from "react-icons/md";
 import "./App.css";
 import Modal from "./Modal";
 import ProjectForm from "./ProjectForm";
-import TaskForm from "./TaskForm"; // Import TaskForm
+import TaskForm from "./TaskForm";
 
 const BASE_URL = "http://localhost:5000";
 function App() {
@@ -15,7 +19,9 @@ function App() {
   const [editIndex, setEditIndex] = useState();
   const [tasks, setTasks] = useState([]);
   const [activeProjectForTasks, setActiveProjectForTasks] = useState(null);
+
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -115,6 +121,22 @@ function App() {
     }
   }
 
+  async function handleUpdateTask(taskId, updates) {
+    try {
+      const res = await fetch(`${BASE_URL}/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+        headers: { "content-type": "application/json" },
+      });
+      const updatedTask = await res.json();
+      setTasks((prev) => prev.map((t) => (t._id === taskId ? updatedTask : t)));
+      setEditingTask(null); // Clear edit mode if checking done
+    } catch (e) {
+      console.log(e);
+      alert("Couldn't update task.");
+    }
+  }
+
   function openTaskModal(project) {
     setActiveProjectForTasks(project);
     fetchTasks(project._id);
@@ -170,7 +192,18 @@ function App() {
         </div>
 
         <div className="mb-4">
-          <TaskForm onFormSubmit={handleCreateTask} />
+          <TaskForm
+            onFormSubmit={(data) => {
+              if (editingTask) {
+                handleUpdateTask(editingTask._id, data);
+              } else {
+                handleCreateTask(data);
+              }
+            }}
+            initialTitle={editingTask?.title || ""}
+            isEditing={!!editingTask}
+            onCancel={() => setEditingTask(null)}
+          />
         </div>
 
         <div className="max-h-[300px] overflow-y-auto">
@@ -180,18 +213,52 @@ function App() {
           {tasks.map((task) => (
             <div
               key={task._id}
-              className="flex justify-between items-center bg-gray-50 p-2 mb-2 rounded border border-gray-100"
+              className={`flex justify-between items-center bg-gray-50 p-2 mb-2 rounded border border-gray-100 ${
+                task.status === "Done" ? "opacity-50" : ""
+              }`}
             >
-              <div>
-                <div className="font-medium">{task.title}</div>
-                <div className="text-xs text-gray-500">{task.status}</div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    handleUpdateTask(task._id, {
+                      status: task.status === "Done" ? "To Do" : "Done",
+                    })
+                  }
+                  className="text-xl text-blue-500"
+                >
+                  {task.status === "Done" ? (
+                    <MdCheckBox />
+                  ) : (
+                    <MdCheckBoxOutlineBlank />
+                  )}
+                </button>
+                <div>
+                  <div
+                    className={`font-medium ${
+                      task.status === "Done" ? "line-through text-gray-500" : ""
+                    }`}
+                  >
+                    {task.title}
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={() => handleDeleteTask(task._id)}
-                className="text-red-500 text-sm hover:underline"
-              >
-                Delete
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditingTask(task);
+                    // Optional: Scroll to top of list or form
+                  }}
+                  className="text-blue-500 text-sm hover:underline"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteTask(task._id)}
+                  className="text-red-500 text-sm hover:underline"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>

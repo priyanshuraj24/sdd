@@ -38,6 +38,37 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Update a task
+router.patch("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, status } = req.body;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid task ID" });
+    }
+
+    const updates = {};
+    if (title) updates.title = title;
+    if (status) updates.status = status;
+
+    const task = await TaskModel.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true }
+    );
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.json(task);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Unable to update task" });
+  }
+});
+
 // Delete a task
 router.delete("/:id", async (req, res) => {
   try {
