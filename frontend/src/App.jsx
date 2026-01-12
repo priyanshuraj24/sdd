@@ -1,17 +1,21 @@
 import { useState } from "react";
 
-import "./App.css";
 import { useEffect } from "react";
-import ProjectForm from "./ProjectForm";
-import Modal from "./Modal";
-import { MdOutlineEdit } from "react-icons/md";
 import { IoClose } from "react-icons/io5";
+import { MdOutlineEdit } from "react-icons/md";
+import "./App.css";
+import Modal from "./Modal";
+import ProjectForm from "./ProjectForm";
+import TaskForm from "./TaskForm"; // Import TaskForm
 
 const BASE_URL = "http://localhost:5000";
 function App() {
   const [projects, setProjects] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editIndex, setEditIndex] = useState();
+  const [tasks, setTasks] = useState([]);
+  const [activeProjectForTasks, setActiveProjectForTasks] = useState(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -69,6 +73,60 @@ function App() {
     setShowModal(false);
   }
 
+  // Task Management Functions
+  async function fetchTasks(projectId) {
+    try {
+      const res = await fetch(`${BASE_URL}/tasks/${projectId}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setTasks(data);
+      } else {
+        setTasks([]);
+        console.error("Expected array of tasks, got:", data);
+      }
+    } catch (e) {
+      console.log(e);
+      alert("Couldn't fetch tasks.");
+    }
+  }
+
+  async function handleCreateTask({ title }) {
+    try {
+      const res = await fetch(`${BASE_URL}/tasks`, {
+        method: "POST",
+        body: JSON.stringify({ title, projectId: activeProjectForTasks._id }),
+        headers: { "content-type": "application/json" },
+      });
+      const newTask = await res.json();
+      setTasks((prev) => [newTask, ...prev]);
+    } catch (e) {
+      console.log(e);
+      alert("Couldn't create task.");
+    }
+  }
+
+  async function handleDeleteTask(taskId) {
+    try {
+      await fetch(`${BASE_URL}/tasks/${taskId}`, { method: "DELETE" });
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+    } catch (e) {
+      console.log(e);
+      alert("Couldn't delete task.");
+    }
+  }
+
+  function openTaskModal(project) {
+    setActiveProjectForTasks(project);
+    fetchTasks(project._id);
+    setShowTaskModal(true);
+  }
+
+  function closeTaskModal() {
+    setShowTaskModal(false);
+    setActiveProjectForTasks(null);
+    setTasks([]);
+  }
+
   return (
     <div className="max-w-md m-auto p-6">
       <Modal
@@ -92,6 +150,51 @@ function App() {
             editIndex != undefined ? projects[editIndex] : undefined
           }
         />
+      </Modal>
+
+      {/* Task Modal */}
+      <Modal
+        className="bg-white w-[500px] rounded-md border border-gray-200 p-4"
+        show={showTaskModal}
+      >
+        <div className="flex items-center mb-4 justify-between">
+          <h2 className="text-xl font-medium">
+            Tasks for {activeProjectForTasks?.title}
+          </h2>
+          <button
+            onClick={closeTaskModal}
+            className="h-6 w-6 center rounded-full border border-gray-400"
+          >
+            <IoClose />
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <TaskForm onFormSubmit={handleCreateTask} />
+        </div>
+
+        <div className="max-h-[300px] overflow-y-auto">
+          {tasks.length === 0 && (
+            <p className="text-gray-500 text-center">No tasks yet.</p>
+          )}
+          {tasks.map((task) => (
+            <div
+              key={task._id}
+              className="flex justify-between items-center bg-gray-50 p-2 mb-2 rounded border border-gray-100"
+            >
+              <div>
+                <div className="font-medium">{task.title}</div>
+                <div className="text-xs text-gray-500">{task.status}</div>
+              </div>
+              <button
+                onClick={() => handleDeleteTask(task._id)}
+                className="text-red-500 text-sm hover:underline"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
       </Modal>
 
       <button
@@ -130,6 +233,12 @@ function App() {
                 className="absolute center w-8 h-8 -right-4 -top-4 border border-gray-300 bg-white rounded-full"
               >
                 <MdOutlineEdit />
+              </button>
+              <button
+                onClick={() => openTaskModal(project)}
+                className="absolute center w-24 h-8 bottom-4 right-4 border border-blue-500 text-blue-500 rounded hover:bg-blue-50 text-sm"
+              >
+                View Tasks
               </button>
             </div>
           ))}
